@@ -1,0 +1,167 @@
+---
+title: "Practical Machine Learning Project Report"
+author: "Karthic C M"
+date: "12 May 2018"
+output: md_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+title: "Practical Machine Learning Project"
+output: html_document
+---
+###Target Summary
+In this project is Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har
+
+Note: The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+#####Libraries used in this project
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+
+```
+
+###Loading data sets
+
+```{r}
+setwd("C:/Users/use/Documents/cat")
+
+training <- read.csv("pml-training.csv",na.strings=c("NA","#DIV/0!", ""))
+```
+{r, echo=FALSE}
+dim ( training  )
+```
+```{r}
+testing <- read.csv("pml-testing.csv",na.strings=c("NA","#DIV/0!", ""))
+```
+{r, echo=FALSE}
+dim ( testing  )
+```
+#The training set consists of 19622 observations of 160 variables
+#The testing set consists of 20 observations of 160 variables
+
+```
+-The training set consists of 19622 observations of 160 variables
+
+-The testing set consists of 20 observations of 160 variables
+
+### Cleaning data
+Columns in the orignal training and testing datasets that are mostly filled with missing values are then removed count the number of missing values in each column of the full training dataset
+```{r}
+training <-training[,colSums(is.na(training)) == 0]
+testing <-testing[,colSums(is.na(testing)) == 0]
+```
+
+```{r}
+training   <-training[,-c(1:7)]
+testing <-testing[,-c(1:7)]
+
+dim ( training ) 
+
+dim ( testing  )
+```
+
+
+###zero variance predictors
+Diagnoses predictors that have one unique value (i.e. are zero variance predictors) or predictors that are have both of the following characteristics
+```{r}
+
+ColumnsZVar <- nearZeroVar(training, saveMetrics = TRUE)
+training <- training[, ColumnsZVar$nzv==FALSE]
+training$classe = factor(training$classe)
+```
+
+
+Partitioning the training data This validation dataset will allow us to perform cross validation when developing our model.
+
+
+### Partitioning the training data set to allow cross-validation
+```{r}
+set.seed(1234)
+subTrain <- createDataPartition(y=training$classe, p=.75, list=FALSE)
+
+TheTraining <- training[subTrain, ]
+TheTesting <- training[-subTrain, ]
+```
+
+
+Ddataset contains 59 variables, with the last column containing the 'class' variable we are trying to predict.
+
+### Modelprediction 1 : Using Decision Tree
+```{r}
+modelDT <- rpart(classe ~ ., data=TheTraining, method="class")
+```
+
+```{r}
+predictionDT <- predict(modelDT, TheTesting, type ="class")
+```
+
+### Plot of the Decision Tree
+```{r}
+rpart.plot(modelDT, main="Decision Tree ", extra=102, under=TRUE, faclen=0)
+fancyRpartPlot (modelDT, main="Decision Tree")
+```
+
+###Test results on our subTesting data set:
+```{r}
+confusionMatrix(predictionDT,TheTesting$classe)
+```
+The Confusion Matrix achieved  0.7394 % accuracy. Here, the 95% CI : (0.7269, 0.7516). The Kappa statistic of  0.6697  reflects the out-of-sample error. 
+For the above values is necessary to use the method toRandom Forest Model determineis much better estimator and predictor.
+
+Applied the Random Forest Model and it has shown significant amount of accuracy in prediction.
+
+### Modelprediction 2 : Using Random Forest
+```{r}
+modelRF <- randomForest(classe ~. , data=TheTraining, method="class")
+print (modelRF)
+```
+### Predicting:
+
+```{r}
+predictionRF <- predict(modelRF, TheTesting, type = "class")
+```
+### Test results on subTesting data set:
+```{r, echo=TRUE}
+confusionMatrix(predictionRF, TheTesting$classe)
+```
+The Confusion Matrix achieved 99.51% accuracy.in the 95% CI : (0.9927, 0.9969)  and the OOB (Out-Of-Bag) Error Rate is 0.43%.The Kappa statistic of  0.9938  reflects the out-of-sample error
+
+
+###Decision
+
+As expected, Random Forest algorithm performed better than Decision Trees.
+Accuracy for Random Forest model was Accuracy : 0.9951  and (95% CI: ((0.9927, 0.9969))) compared to 95% CI : (0.7269, 0.7516) for Decision Tree model. 
+The random Forest model is choosen. The accuracy of the model is 0.995. The expected out-of-sample error is estimated at 0.005, or 0.5%. The expected out-of-sample error is calculated as 1 - accuracy for predictions made against the cross-validation set. Our Test data set comprises 20 cases. With an accuracy above 99% on our cross-validation data, we can expect that very few, or none, of the test samples will be missclassified.
+
+###Conclusion
+
+Of the two Prediction Methods used in the study, accuracy was better for the  The Random Forest method since the Confusion Matrix achieves approximately only.
+The random forest clearly performs better, approaching 99% accuracy for in-sample and out-of-sample error so we will select this model and apply it to the test data set. We use the provided function to classify 20 data points from the test set by the type of lift. We then upload these classifications to Coursera to confirm that the model is working correctly.
+
+###Submission
+
+```{r}
+answers<- as.vector(predictionRF[1:20])
+pml_write_files  =  function ( x ) { 
+  n  =  length ( x ) 
+  for ( i  in  1 : n ) { 
+    filename  =  paste0 ( "problem_id_" , i , ".txt" ) 
+    write.table ( x [ i ] , file = filename , quote = FALSE , row.names = FALSE , col.names = FALSE ) 
+  } 
+}
+
+pml_write_files ( answers )
+```
+
+
